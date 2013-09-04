@@ -1,0 +1,4 @@
+include 'glovr'
+//include 'example'
+
+rootProject.name = 'glovr-all'
