@@ -7,5 +7,6 @@
 
 build
 */build
-.idea
+*/.idea
 *.iml
+repo

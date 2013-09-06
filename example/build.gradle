@@ -6,10 +6,11 @@ buildscript {
         maven {
             url uri('../repo')
         }
+        mavenCentral()
+
     }
     dependencies {
-//        classpath group: 'com.wileyfuller', name: 'glovr', version: '1.0-SNAPSHOT'
-        project(':glovr')
+        classpath group: 'com.wileyfuller', name: 'glovr', version: '1.0-SNAPSHOT'
     }
 }
 apply plugin: 'glovr'
