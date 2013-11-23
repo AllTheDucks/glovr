@@ -4,6 +4,7 @@ import com.google.gson.Gson
 import org.gradle.api.Project
 import org.gradle.api.Plugin
 import org.gradle.api.tasks.JavaExec
+import org.gradle.api.tasks.TaskInstantiationException
 
 class GlovrPlugin implements Plugin<Project> {
     String userHome = System.getProperty("user.home")
@@ -13,8 +14,17 @@ class GlovrPlugin implements Plugin<Project> {
     File tmpDir = new File(System.getProperty('java.io.tmpdir'))
 
 
+
     void apply(Project project) {
-//        project.extensions.create("greeting", GreetingPluginExtension)
+        if (!project.plugins.hasPlugin("war")) {
+            throw new TaskInstantiationException("War plugin has to be applied before Glovr plugin")
+        }
+
+        project.extensions.create("glovr", GlovrPluginExtension)
+
+        String serveMode = project.glovr.serveMode ? project.glovr.serveMode : project.glovr.mode
+        String buildMode = project.glovr.buildMode ? project.glovr.buildMode : project.glovr.mode
+
         project.task('plovrServe') << {
             checkPlovrJar(project)
             String configFileName = generatePlovrServeConfig(project)
@@ -27,18 +37,24 @@ class GlovrPlugin implements Plugin<Project> {
         }
 
 
-        project.task('plovrBuild') << {
-            checkPlovrJar(project)
-            String configFileName = generatePlovrBuildConfig(project)
-            project.javaexec {
-                main = 'org.plovr.cli.Main'
-                classpath = project.files(plovrJar)
-                args 'build', tmpDir.absolutePath + '/' + configFileName
-                systemProperty 'java.net.preferIPv4Stack', 'true'
+        project.task('plovrBuild') {
+//        task plovrBuild  {
+            inputs.dir getJsRootAbsolute(project)
+            outputs.dir new File("$project.buildDir/plovr/compiled/$project.glovr.jsOutputDir")
+            doLast {
+                checkPlovrJar(project)
+                String configFileName = generatePlovrBuildConfig(project)
+                project.javaexec {
+                    main = 'org.plovr.cli.Main'
+                    classpath = project.files(plovrJar)
+                    args 'build', tmpDir.absolutePath + '/' + configFileName
+                    systemProperty 'java.net.preferIPv4Stack', 'true'
+                }
             }
 
         }
 
+        project.war.from "$project.buildDir/plovr/compiled"
         project.war.dependsOn project.plovrBuild
 
     }
@@ -57,31 +73,52 @@ class GlovrPlugin implements Plugin<Project> {
         }
     }
 
+
     String generatePlovrServeConfig(Project project) {
-        String fileName = project.name + "-plovr-SERVE.js"
-        File configFile = new File(tmpDir, fileName)
-        configFile.withWriter { out ->
-            out.write("{\"id\": \"$project.name\", \"paths\": \".\"," +
-                    "  \"inputs\": \"main.js\"}")
-        }
+        String mode = project.glovr.serveMode ? project.glovr.serveMode : project.glovr.mode;
+        String fileName = generatePlovrConfig(project, 'SERVE', mode)
         return fileName;
     }
 
     String generatePlovrBuildConfig(Project project) {
-        String fileName = project.name + "-plovr-BUILD.js"
+        String mode = project.glovr.buildMode ? project.glovr.buildMode : project.glovr.mode;
+        String fileName = generatePlovrConfig(project, 'BUILD', mode)
+
+        return fileName;
+    }
+
+    String generatePlovrConfig(Project project, String configName, String mode) {
+        String fileName = project.name + "-plovr-" + configName + ".js"
         File configFile = new File(tmpDir, fileName)
-        def configMap = [id: project.name, paths: new String("$project.projectDir/src/main/javascript"),
-                inputs: new String("$project.projectDir/src/main/javascript/main.js"),
-                'output-file': new String("$project.buildDir/plovr/compiled/main.js")]
+        String jsRoot = getJsRootAbsolute(project).absolutePath
+
+        def configMap = [id: project.name,
+                paths: new String("$jsRoot"),
+                inputs: new String("$jsRoot/$project.glovr.mainJs"),
+                mode: mode,
+                externs: project.glovr.externs,
+                'output-file': new String("$project.buildDir/plovr/compiled/$project.glovr.jsOutputDir/$project.glovr.mainJs")]
+
         Gson gson = new Gson();
         configFile.withWriter { out ->
             out.write(gson.toJson(configMap))
-//            out.write("{\"id\": \"$project.name\", \"paths\": \"$project.projectDir/src/main/javascript\"," +
-//                    "  \"inputs\": \"$project.projectDir/src/main/javascript/main.js\"," +
-//                    "\"output-file\":\"$project.buildDir/plovr/compiled/main.js\"}")
         }
-        project.war.from "$project.buildDir/plovr/compiled/main.js"
+
         return fileName;
+    }
+
+    File getJsRootAbsolute(Project project) {
+        return new File(project.projectDir, project.glovr.jsRoot)
     }
 }
 
+
+class GlovrPluginExtension {
+    def mainJs = "main.js"
+    def jsRoot = "/src/main/javascript/"
+    def jsOutputDir = "js"
+    def mode = "SIMPLE"
+    def serveMode = null
+    def buildMode = null
+    def externs = []
+}
