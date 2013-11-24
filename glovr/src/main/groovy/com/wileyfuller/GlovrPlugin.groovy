@@ -96,8 +96,9 @@ class GlovrPlugin implements Plugin<Project> {
                 paths: new String("$jsRoot"),
                 inputs: new String("$jsRoot/$project.glovr.mainJs"),
                 mode: mode,
-                externs: project.glovr.externs,
-                'output-file': new String("$project.buildDir/plovr/compiled/$project.glovr.jsOutputDir/$project.glovr.mainJs")]
+                externs: getExterns(project),
+                'output-file': new String("$project.buildDir/plovr/compiled/$project.glovr.jsOutputDir/$project.glovr.mainJs"),
+                'checks': ["externsValidation": "OFF"] ]
 
         Gson gson = new Gson();
         configFile.withWriter { out ->
@@ -105,6 +106,21 @@ class GlovrPlugin implements Plugin<Project> {
         }
 
         return fileName;
+    }
+
+    List<String> getExterns(Project project) {
+        List<String> externs = new ArrayList<String>()
+
+        if(project.glovr.externs) {
+            for(extern in project.glovr.externs) {
+                File externFile = new File(project.projectDir, extern)
+                externs.add(externFile.absolutePath)
+            }
+        } else {
+            //TODO: auto discovery
+        }
+
+        return externs
     }
 
     File getJsRootAbsolute(Project project) {
@@ -120,5 +136,5 @@ class GlovrPluginExtension {
     def mode = "SIMPLE"
     def serveMode = null
     def buildMode = null
-    def externs = []
+    def externs = null
 }
