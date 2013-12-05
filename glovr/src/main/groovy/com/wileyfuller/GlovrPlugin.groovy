@@ -16,10 +16,6 @@ class GlovrPlugin implements Plugin<Project> {
 
 
     void apply(Project project) {
-        if (!project.plugins.hasPlugin("war")) {
-            throw new TaskInstantiationException("War plugin has to be applied before Glovr plugin")
-        }
-
         project.extensions.create("glovr", GlovrPluginExtension)
 
         String serveMode = project.glovr.serveMode ? project.glovr.serveMode : project.glovr.mode
@@ -54,8 +50,10 @@ class GlovrPlugin implements Plugin<Project> {
 
         }
 
-        project.war.from "$project.buildDir/plovr/compiled"
-        project.war.dependsOn project.plovrBuild
+        if (project.plugins.hasPlugin("war")) {
+            project.war.from "$project.buildDir/plovr/compiled"
+            project.war.dependsOn project.plovrBuild
+        }
 
     }
 
