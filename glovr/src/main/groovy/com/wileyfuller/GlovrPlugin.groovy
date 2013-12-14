@@ -98,6 +98,8 @@ class GlovrPlugin implements Plugin<Project> {
                 'output-file': new String("$project.buildDir/plovr/compiled/$project.glovr.jsOutputDir/$project.glovr.mainJs"),
                 'checks': ["externsValidation": "OFF"] ]
 
+        configMap.putAll(project.glovr.options)
+
         Gson gson = new Gson();
         configFile.withWriter { out ->
             out.write(gson.toJson(configMap))
@@ -135,4 +137,5 @@ class GlovrPluginExtension {
     def serveMode = null
     def buildMode = null
     def externs = null
+    def options = null
 }
