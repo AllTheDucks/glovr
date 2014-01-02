@@ -90,8 +90,17 @@ class GlovrPlugin implements Plugin<Project> {
         File configFile = new File(tmpDir, fileName)
         String jsRoot = getJsRootAbsolute(project).absolutePath
 
+        List<String> paths = new ArrayList<String>();
+        paths.add(new String("$jsRoot"));
+
+        if (project.glovr.paths instanceof Collection<? extends String>) {
+            paths.addAll(project.glovr.paths);
+        } else {
+            paths.add(project.glovr.paths.toString());
+        }
+
         def configMap = [id: project.name,
-                paths: new String("$jsRoot"),
+                paths: paths,
                 inputs: new String("$jsRoot/$project.glovr.mainJs"),
                 mode: mode,
                 externs: getExterns(project),
@@ -135,4 +144,5 @@ class GlovrPluginExtension {
     def serveMode = null
     def buildMode = null
     def externs = null
+    def paths = null
 }
