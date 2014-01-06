@@ -6,8 +6,7 @@
 *.ear
 
 build
-*/build
-*/.idea
+.idea
 *.iml
 repo
-*/.gradle
+.gradle
