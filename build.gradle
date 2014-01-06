@@ -1,6 +1,6 @@
 apply plugin: 'groovy'
 
-group = 'com.wileyfuller'
+group = 'com.alltheducks'
 version = '1.0-SNAPSHOT'
 
 dependencies {

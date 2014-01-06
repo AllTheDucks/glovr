@@ -1,10 +1,8 @@
-package com.wileyfuller
+package com.alltheducks
 
 import com.google.gson.Gson
 import org.gradle.api.Project
 import org.gradle.api.Plugin
-import org.gradle.api.tasks.JavaExec
-import org.gradle.api.tasks.TaskInstantiationException
 
 class GlovrPlugin implements Plugin<Project> {
     String userHome = System.getProperty("user.home")
