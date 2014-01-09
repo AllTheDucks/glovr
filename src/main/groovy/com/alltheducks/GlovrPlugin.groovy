@@ -15,11 +15,11 @@ class GlovrPlugin implements Plugin<Project> {
         glovrHome.mkdirs();
         plovrJar = new File(glovrHome,project.glovr.jarName)
 
-        def paths = getPaths(project);
+
 
         project.task('plovrServe') << {
             checkPlovrJar(project)
-            String configFileName = generatePlovrServeConfig(paths, project)
+            String configFileName = generatePlovrServeConfig(project)
             project.javaexec {
                 main = 'org.plovr.cli.Main'
                 classpath = project.files(plovrJar)
@@ -30,11 +30,11 @@ class GlovrPlugin implements Plugin<Project> {
 
 
         project.task('plovrBuild') {
-            inputs.dir paths
+            inputs.dir getPaths(project)
             outputs.dir new File("$project.buildDir/plovr/compiled/$project.glovr.jsOutputDir")
             doLast {
                 checkPlovrJar(project)
-                String configFileName = generatePlovrBuildConfig(paths, project)
+                String configFileName = generatePlovrBuildConfig(project)
                 project.javaexec {
                     main = 'org.plovr.cli.Main'
                     classpath = project.files(plovrJar)
@@ -46,10 +46,10 @@ class GlovrPlugin implements Plugin<Project> {
         }
 
         project.task('gjslint') {
-            inputs.dir paths
+            inputs.dir getPaths(project)
             outputs.upToDateWhen( { return true } );
             doLast {
-                def command = getLinterCommand('gjslint', paths, project);
+                def command = getLinterCommand('gjslint', project);
                 logger.info(command);
                 def proc
                 try {
@@ -80,10 +80,10 @@ class GlovrPlugin implements Plugin<Project> {
         }
 
         project.task('fixjsstyle') {
-            inputs.dir paths
+            inputs.dir getPaths(project)
             outputs.upToDateWhen( { return true } );
             doLast {
-                def command = getLinterCommand('fixjsstyle', paths, project);
+                def command = getLinterCommand('fixjsstyle', project);
                 logger.info(command);
                 def proc
                 try {
@@ -127,26 +127,26 @@ class GlovrPlugin implements Plugin<Project> {
         }
     }
 
-    String generatePlovrServeConfig(List<String> paths, Project project) {
+    String generatePlovrServeConfig(Project project) {
         String mode = project.glovr.serveMode ? project.glovr.serveMode : project.glovr.mode;
-        String fileName = generatePlovrConfig(project, 'SERVE', mode, paths)
+        String fileName = generatePlovrConfig(project, 'SERVE', mode)
         return fileName;
     }
 
-    String generatePlovrBuildConfig(List<String> paths ,Project project) {
+    String generatePlovrBuildConfig(Project project) {
         String mode = project.glovr.buildMode ? project.glovr.buildMode : project.glovr.mode;
-        String fileName = generatePlovrConfig(project, 'BUILD', mode, paths)
+        String fileName = generatePlovrConfig(project, 'BUILD', mode)
 
         return fileName;
     }
 
-    String generatePlovrConfig(Project project, String configName, String mode, List<String> paths) {
+    String generatePlovrConfig(Project project, String configName, String mode) {
         String fileName = project.name + "-plovr-" + configName + ".js"
         File configFile = new File(glovrHome, fileName)
         String jsRoot = getJsRootAbsolute(project).absolutePath
 
         def configMap = [id: project.name,
-                paths: paths,
+                paths: getPaths(project),
                 inputs: new String("$jsRoot/$project.glovr.mainJs"),
                 mode: mode,
                 externs: getExterns(project),
