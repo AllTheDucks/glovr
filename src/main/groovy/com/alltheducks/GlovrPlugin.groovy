@@ -15,9 +15,11 @@ class GlovrPlugin implements Plugin<Project> {
         glovrHome.mkdirs();
         plovrJar = new File(glovrHome,project.glovr.jarName)
 
+        def paths = getPaths(project);
+
         project.task('plovrServe') << {
             checkPlovrJar(project)
-            String configFileName = generatePlovrServeConfig(project)
+            String configFileName = generatePlovrServeConfig(paths, project)
             project.javaexec {
                 main = 'org.plovr.cli.Main'
                 classpath = project.files(plovrJar)
@@ -28,11 +30,11 @@ class GlovrPlugin implements Plugin<Project> {
 
 
         project.task('plovrBuild') {
-            inputs.dir getJsRootAbsolute(project)
+            inputs.dir paths
             outputs.dir new File("$project.buildDir/plovr/compiled/$project.glovr.jsOutputDir")
             doLast {
                 checkPlovrJar(project)
-                String configFileName = generatePlovrBuildConfig(project)
+                String configFileName = generatePlovrBuildConfig(paths, project)
                 project.javaexec {
                     main = 'org.plovr.cli.Main'
                     classpath = project.files(plovrJar)
@@ -44,10 +46,10 @@ class GlovrPlugin implements Plugin<Project> {
         }
 
         project.task('gjslint') {
-            inputs.dir getJsRootAbsolute(project)
+            inputs.dir paths
             outputs.upToDateWhen( { return true } );
             doLast {
-                def command = getLinterCommand('gjslint', project);
+                def command = getLinterCommand('gjslint', paths, project);
                 logger.info(command);
                 def proc
                 try {
@@ -78,10 +80,10 @@ class GlovrPlugin implements Plugin<Project> {
         }
 
         project.task('fixjsstyle') {
-            inputs.dir getJsRootAbsolute(project)
+            inputs.dir paths
             outputs.upToDateWhen( { return true } );
             doLast {
-                def command = getLinterCommand('fixjsstyle', project);
+                def command = getLinterCommand('fixjsstyle', paths, project);
                 logger.info(command);
                 def proc
                 try {
@@ -125,26 +127,26 @@ class GlovrPlugin implements Plugin<Project> {
         }
     }
 
-    String generatePlovrServeConfig(Project project) {
+    String generatePlovrServeConfig(List<String> paths, Project project) {
         String mode = project.glovr.serveMode ? project.glovr.serveMode : project.glovr.mode;
-        String fileName = generatePlovrConfig(project, 'SERVE', mode)
+        String fileName = generatePlovrConfig(project, 'SERVE', mode, paths)
         return fileName;
     }
 
-    String generatePlovrBuildConfig(Project project) {
+    String generatePlovrBuildConfig(List<String> paths ,Project project) {
         String mode = project.glovr.buildMode ? project.glovr.buildMode : project.glovr.mode;
-        String fileName = generatePlovrConfig(project, 'BUILD', mode)
+        String fileName = generatePlovrConfig(project, 'BUILD', mode, paths)
 
         return fileName;
     }
 
-    String generatePlovrConfig(Project project, String configName, String mode) {
+    String generatePlovrConfig(Project project, String configName, String mode, List<String> paths) {
         String fileName = project.name + "-plovr-" + configName + ".js"
         File configFile = new File(glovrHome, fileName)
         String jsRoot = getJsRootAbsolute(project).absolutePath
 
         def configMap = [id: project.name,
-                paths: getPaths(project),
+                paths: paths,
                 inputs: new String("$jsRoot/$project.glovr.mainJs"),
                 mode: mode,
                 externs: getExterns(project),
@@ -161,10 +163,10 @@ class GlovrPlugin implements Plugin<Project> {
         return fileName;
     }
 
-    String getLinterCommand(String command, Project project) {
+    String getLinterCommand(String command, List<String> paths, Project project) {
         def path
         if(project.glovr.lintPaths) {
-            path = getPaths(project).join(" ")
+            path = paths.join(" ")
         } else {
             path = getJsRootAbsolute(project).absolutePath
         }
@@ -181,7 +183,7 @@ class GlovrPlugin implements Plugin<Project> {
 
         if (project.glovr.paths instanceof Collection<? extends String>) {
             paths.addAll(project.glovr.paths);
-        } else {
+        } else if(project.glovr.paths != null) {
             paths.add(project.glovr.paths.toString());
         }
         return paths
