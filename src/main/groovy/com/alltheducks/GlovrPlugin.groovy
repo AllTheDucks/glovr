@@ -5,19 +5,15 @@ import org.gradle.api.Project
 import org.gradle.api.Plugin
 
 class GlovrPlugin implements Plugin<Project> {
-    String userHome = System.getProperty("user.home")
-    String plovrJarName = "plovr-81ed862.jar";
-    File plovrHome = new File("$userHome/plovr")
-    File plovrJar = new File("$plovrHome/$plovrJarName")
-    File tmpDir = new File(System.getProperty('java.io.tmpdir'))
-
-
+    File glovrHome
+    File plovrJar
 
     void apply(Project project) {
         project.extensions.create("glovr", GlovrPluginExtension)
 
-        String serveMode = project.glovr.serveMode ? project.glovr.serveMode : project.glovr.mode
-        String buildMode = project.glovr.buildMode ? project.glovr.buildMode : project.glovr.mode
+        glovrHome = new File(project.rootProject.projectDir, ".glovr")
+        glovrHome.mkdirs();
+        plovrJar = new File(glovrHome,project.glovr.jarName)
 
         project.task('plovrServe') << {
             checkPlovrJar(project)
@@ -25,14 +21,13 @@ class GlovrPlugin implements Plugin<Project> {
             project.javaexec {
                 main = 'org.plovr.cli.Main'
                 classpath = project.files(plovrJar)
-                args 'serve', tmpDir.absolutePath + '/' + configFileName
+                args 'serve', glovrHome.absolutePath + '/' + configFileName
                 systemProperty 'java.net.preferIPv4Stack', 'true'
             }
         }
 
 
         project.task('plovrBuild') {
-//        task plovrBuild  {
             inputs.dir getJsRootAbsolute(project)
             outputs.dir new File("$project.buildDir/plovr/compiled/$project.glovr.jsOutputDir")
             doLast {
@@ -41,11 +36,72 @@ class GlovrPlugin implements Plugin<Project> {
                 project.javaexec {
                     main = 'org.plovr.cli.Main'
                     classpath = project.files(plovrJar)
-                    args 'build', tmpDir.absolutePath + '/' + configFileName
+                    args 'build', glovrHome.absolutePath + '/' + configFileName
                     systemProperty 'java.net.preferIPv4Stack', 'true'
                 }
             }
 
+        }
+
+        project.task('gjslint') {
+            inputs.dir getJsRootAbsolute(project)
+            outputs.upToDateWhen( { return true } );
+            doLast {
+                def command = getLinterCommand('gjslint', project);
+                logger.info(command);
+                def proc
+                try {
+                    proc = command.execute()
+                } catch (IOException ioex) {
+                    println 'Google Closure Linter is not installed. If you install it, your javascript will be automatically linted.'
+                    return
+                }
+
+                proc.waitFor()
+
+                switch(proc.exitValue()) {
+                    case 0:
+                        logger.info(proc.text);
+                    break
+
+                    case 1:
+                        println proc.text;
+                        throw new Exception("Javascript linting errors found; please fix them. Some may be automatically fixed using the fixjsstyle task.")
+                    break
+
+                    default:
+                        println proc.text;
+                        throw new Exception("Unknown exit code: ${ proc.exitValue() }")
+                    break
+                }
+            }
+        }
+
+        project.task('fixjsstyle') {
+            inputs.dir getJsRootAbsolute(project)
+            outputs.upToDateWhen( { return true } );
+            doLast {
+                def command = getLinterCommand('fixjsstyle', project);
+                logger.info(command);
+                def proc
+                try {
+                    proc = command.execute()
+                } catch (IOException ioex) {
+                    println 'Google Closure Linter is not installed. If you install it, your javascript will have some linting errors automatically fixed.'
+                    return
+                }
+
+                proc.waitFor()
+
+                println proc.text;
+                if(proc.exitValue() != 0) {
+                    throw new Exception("Unknown exit code: ${ proc.exitValue() }")
+                }
+            }
+        }
+
+        if(project.glovr.autoLint) {
+            project.plovrBuild.dependsOn project.gjslint
         }
 
         if (project.plugins.hasPlugin("war")) {
@@ -59,8 +115,8 @@ class GlovrPlugin implements Plugin<Project> {
 
         if (!plovrJar.exists()) {
             project.ant.get(
-                    src: "https://plovr.googlecode.com/files/$plovrJarName",
-                    dest: plovrHome
+                    src: "https://plovr.googlecode.com/files/$project.glovr.jarName",
+                    dest: glovrHome
             )
         } else {
             //TODO Change this to an INFO level log statement
@@ -68,7 +124,6 @@ class GlovrPlugin implements Plugin<Project> {
 
         }
     }
-
 
     String generatePlovrServeConfig(Project project) {
         String mode = project.glovr.serveMode ? project.glovr.serveMode : project.glovr.mode;
@@ -85,20 +140,11 @@ class GlovrPlugin implements Plugin<Project> {
 
     String generatePlovrConfig(Project project, String configName, String mode) {
         String fileName = project.name + "-plovr-" + configName + ".js"
-        File configFile = new File(tmpDir, fileName)
+        File configFile = new File(glovrHome, fileName)
         String jsRoot = getJsRootAbsolute(project).absolutePath
 
-        List<String> paths = new ArrayList<String>();
-        paths.add(new String("$jsRoot"));
-
-        if (project.glovr.paths instanceof Collection<? extends String>) {
-            paths.addAll(project.glovr.paths);
-        } else {
-            paths.add(project.glovr.paths.toString());
-        }
-
         def configMap = [id: project.name,
-                paths: paths,
+                paths: getPaths(project),
                 inputs: new String("$jsRoot/$project.glovr.mainJs"),
                 mode: mode,
                 externs: getExterns(project),
@@ -113,6 +159,32 @@ class GlovrPlugin implements Plugin<Project> {
         }
 
         return fileName;
+    }
+
+    String getLinterCommand(String command, Project project) {
+        def path
+        if(project.glovr.lintPaths) {
+            path = getPaths(project).join(" ")
+        } else {
+            path = getJsRootAbsolute(project).absolutePath
+        }
+
+        def strict = project.glovr.strictLint ? "--strict " : ""
+        return "$command $strict-r $path";
+    }
+
+    List<String> getPaths(Project project) {
+        String jsRoot = getJsRootAbsolute(project).absolutePath
+
+        List<String> paths = new ArrayList<String>();
+        paths.add(new String("$jsRoot"));
+
+        if (project.glovr.paths instanceof Collection<? extends String>) {
+            paths.addAll(project.glovr.paths);
+        } else {
+            paths.add(project.glovr.paths.toString());
+        }
+        return paths
     }
 
     List<String> getExterns(Project project) {
@@ -137,6 +209,7 @@ class GlovrPlugin implements Plugin<Project> {
 
 
 class GlovrPluginExtension {
+    def jarName = "plovr-81ed862.jar"
     def mainJs = "main.js"
     def jsRoot = "/src/main/javascript/"
     def jsOutputDir = "js"
@@ -146,4 +219,9 @@ class GlovrPluginExtension {
     def externs = null
     def paths = null
     def options = null
+
+    def autoLint = true
+    def lintPaths = true
+    def strictLint = true
+
 }
