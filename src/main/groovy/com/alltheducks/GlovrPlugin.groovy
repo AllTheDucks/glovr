@@ -46,8 +46,6 @@ class GlovrPlugin implements Plugin<Project> {
         }
 
         project.task('gjslint') {
-            inputs.dir getPaths(project)
-            outputs.upToDateWhen( { return true } );
             doLast {
                 def command = getLinterCommand('gjslint', project);
                 logger.info(command);
@@ -80,8 +78,6 @@ class GlovrPlugin implements Plugin<Project> {
         }
 
         project.task('fixjsstyle') {
-            inputs.dir getPaths(project)
-            outputs.upToDateWhen( { return true } );
             doLast {
                 def command = getLinterCommand('fixjsstyle', project);
                 logger.info(command);
@@ -163,10 +159,10 @@ class GlovrPlugin implements Plugin<Project> {
         return fileName;
     }
 
-    String getLinterCommand(String command, List<String> paths, Project project) {
+    String getLinterCommand(String command, Project project) {
         def path
         if(project.glovr.lintPaths) {
-            path = paths.join(" ")
+            path = getPaths(project).join(" ")
         } else {
             path = getJsRootAbsolute(project).absolutePath
         }
