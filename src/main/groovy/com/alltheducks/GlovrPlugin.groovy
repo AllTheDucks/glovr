@@ -1,6 +1,7 @@
 package com.alltheducks
 
 import com.google.gson.Gson
+import org.apache.commons.io.FileUtils
 import org.gradle.api.Project
 import org.gradle.api.Plugin
 
@@ -30,8 +31,9 @@ class GlovrPlugin implements Plugin<Project> {
 
 
         project.task('plovrBuild') {
-            inputs.dir getPaths(project)
-            outputs.dir new File("$project.buildDir/plovr/compiled/$project.glovr.jsOutputDir")
+            inputs.files getJsPaths(project).plus(getCssPaths(project))
+            outputs.files(new File("$project.buildDir/plovr/compiled/$project.glovr.jsOutputDir"),
+                    new File("$project.buildDir/plovr/compiled/$project.glovr.cssOutputDir"))
             doLast {
                 checkPlovrJar(project)
                 String configFileName = generatePlovrBuildConfig(project)
@@ -141,13 +143,19 @@ class GlovrPlugin implements Plugin<Project> {
         File configFile = new File(glovrHome, fileName)
         String jsRoot = getJsRootAbsolute(project).absolutePath
 
+
+        def cssDir = new File("$project.buildDir/plovr/compiled/$project.glovr.cssOutputDir");
+        cssDir.mkdirs()
+
         def configMap = [id: project.name,
-                paths: getPaths(project),
+                paths: getJsPaths(project),
                 inputs: new String("$jsRoot/$project.glovr.mainJs"),
                 mode: mode,
                 externs: getExterns(project),
                 'output-file': new String("$project.buildDir/plovr/compiled/$project.glovr.jsOutputDir/$project.glovr.mainJs"),
-                'checks': ["externsValidation": "OFF"] ]
+                'checks': ["externsValidation": "OFF"],
+                'css-inputs': getCssPaths(project),
+                'css-output-file': new File(cssDir, project.glovr.mainCss).getAbsolutePath()]
 
         configMap.putAll(project.glovr.options)
 
@@ -162,7 +170,7 @@ class GlovrPlugin implements Plugin<Project> {
     String getLinterCommand(String command, Project project) {
         def path
         if(project.glovr.lintPaths) {
-            path = getPaths(project).join(" ")
+            path = getJsPaths(project).join(" ")
         } else {
             path = getJsRootAbsolute(project).absolutePath
         }
@@ -171,8 +179,15 @@ class GlovrPlugin implements Plugin<Project> {
         return "$command $strict-r $path";
     }
 
-    List<String> getPaths(Project project) {
+    Collection<String> getCssPaths(Project project) {
+        Collection<File> cssFiles = FileUtils.listFiles(new File(project.projectDir, project.glovr.cssRoot), ['css','gss'] as String[],true)
+        Collection<String> cssPaths = cssFiles*.getAbsolutePath();
+        return cssPaths
+    }
+
+    List<String> getJsPaths(Project project) {
         String jsRoot = getJsRootAbsolute(project).absolutePath
+
 
         List<String> paths = new ArrayList<String>();
         paths.add(new String("$jsRoot"));
@@ -211,6 +226,9 @@ class GlovrPluginExtension {
     def mainJs = "main.js"
     def jsRoot = "/src/main/javascript/"
     def jsOutputDir = "js"
+    def mainCss = "main.css"
+    def cssRoot = "/src/main/css"
+    def cssOutputDir = "css"
     def mode = "SIMPLE"
     def serveMode = null
     def buildMode = null
