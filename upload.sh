@@ -1,6 +1,17 @@
 #!/bin/bash
 
 read -p "Username? " USERNAME
-read -p "Key File? " KEYFILE
+read -p "Key File (absolute path)? " KEYPATH
 
-./gradlew uploadArchives "-PuserName=$USERNAME" "-PkeyPath=$KEYFILE"
+./gradlew uploadArchives "-PuserName=$USERNAME" "-PkeyPath=$KEYPATH"
+
+
+
+
+
+
+
+
+
+
+

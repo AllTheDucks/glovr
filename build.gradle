@@ -23,16 +23,17 @@ repositories {
 
 apply plugin: 'maven'
 
-//task("uploadArtifacts") << {
-//
-//}
+if (!project.hasProperty("userName") || !project.hasProperty("keyPath")) {
+    project.ext.set("userName", "")
+    project.ext.set("keyPath", "")
+}
 
 uploadArchives {
     repositories {
         mavenDeployer {
             configuration = configurations.deployerJars
             repository(url: "scp://alltheducks.com/var/www/repo.alltheducks.com/htdocs") {
-                authentication(userName: userName, privateKey: keyPath)
+                authentication(userName: project.userName, privateKey: project.keyPath)
             }
         }
     }
