@@ -223,7 +223,7 @@ class GlovrPlugin implements Plugin<Project> {
 
         inputArgs.addAll(cssPaths)
 
-        println inputArgs.join(" ")
+        logger.info("Closure Stylesheets Args: " + inputArgs.join(" "))
 
         project.javaexec {
             main = 'com.google.common.css.compiler.commandline.ClosureCommandLineCompiler'
