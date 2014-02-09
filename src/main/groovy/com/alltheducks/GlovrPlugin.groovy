@@ -8,6 +8,7 @@ import org.gradle.api.Plugin
 class GlovrPlugin implements Plugin<Project> {
     File glovrHome
     File plovrJar
+    File stylesheetsJar
 
     void apply(Project project) {
         project.extensions.create("glovr", GlovrPluginExtension)
@@ -15,7 +16,7 @@ class GlovrPlugin implements Plugin<Project> {
         glovrHome = new File(project.rootProject.projectDir, ".glovr")
         glovrHome.mkdirs();
         plovrJar = new File(glovrHome,project.glovr.jarName)
-
+        stylesheetsJar = new File(glovrHome,project.glovr.stylesheetsJarName)
 
 
         project.task('plovrServe') << {
@@ -36,6 +37,10 @@ class GlovrPlugin implements Plugin<Project> {
                     new File("$project.buildDir/plovr/compiled/$project.glovr.cssOutputDir"))
             doLast {
                 checkPlovrJar(project)
+                def cssInputs = getCssPaths(project)
+                if (cssInputs && cssInputs.size() > 0) {
+                    processCss(project, cssInputs)
+                }
                 String configFileName = generatePlovrBuildConfig(project)
                 project.javaexec {
                     main = 'org.plovr.cli.Main'
@@ -115,12 +120,23 @@ class GlovrPlugin implements Plugin<Project> {
 
         if (!plovrJar.exists()) {
             project.ant.get(
-                    src: "https://plovr.googlecode.com/files/$project.glovr.jarName",
+                    src: "https://plovr.googlecode.com/files/${project.glovr.jarName}",
                     dest: glovrHome
             )
         } else {
             //TODO Change this to an INFO level log statement
             //println "Plovr jar already downloaded"
+
+        }
+
+        if (!stylesheetsJar.exists()) {
+            project.ant.get(
+                    src: "https://closure-stylesheets.googlecode.com/files/${project.glovr.stylesheetsJarName}",
+                    dest: glovrHome
+            )
+        } else {
+            //TODO Change this to an INFO level log statement
+            //println "closure stylesheets jar already downloaded"
 
         }
     }
@@ -134,7 +150,6 @@ class GlovrPlugin implements Plugin<Project> {
     String generatePlovrBuildConfig(Project project) {
         String mode = project.glovr.buildMode ? project.glovr.buildMode : project.glovr.mode;
         String fileName = generatePlovrConfig(project, 'BUILD', mode)
-
         return fileName;
     }
 
@@ -154,8 +169,7 @@ class GlovrPlugin implements Plugin<Project> {
                 externs: getExterns(project),
                 'output-file': new String("$project.buildDir/plovr/compiled/$project.glovr.jsOutputDir/$project.glovr.mainJs"),
                 'checks': ["externsValidation": "OFF"],
-                'css-inputs': getCssPaths(project),
-                'css-output-file': new File(cssDir, project.glovr.mainCss).getAbsolutePath()]
+                'css-inputs': getCssPaths(project)]
 
         configMap.putAll(project.glovr.options)
 
@@ -184,6 +198,50 @@ class GlovrPlugin implements Plugin<Project> {
         Collection<String> cssPaths = cssFiles*.getAbsolutePath();
         return cssPaths
     }
+
+
+    void processCss(Project project, Collection<String> cssPaths) {
+
+        def cssDir = new File("$project.buildDir/plovr/compiled/$project.glovr.cssOutputDir");
+        cssDir.mkdirs()
+
+        String cssOutputFile = new File(cssDir, project.glovr.mainCss).getAbsolutePath();
+
+        List<String> inputArgs = new ArrayList();
+        def allowedFunctions = project.glovr.options['css-allowed-non-standard-functions']
+        def allowedProps = project.glovr.options['css-allowed-unrecognized-properties']
+
+        inputArgs.addAll(interpolateList('--allowed-non-standard-function', allowedFunctions));
+        inputArgs.addAll(interpolateList('--allowed-unrecognized-property', allowedProps));
+
+        inputArgs.add('--output-file');
+        inputArgs.add(cssOutputFile)
+
+        if(project.glovr.cssDefines) {
+            inputArgs.addAll(interpolateList('--define', project.glovr.cssDefines))
+        }
+
+        inputArgs.addAll(cssPaths)
+
+        println inputArgs.join(" ")
+
+        project.javaexec {
+            main = 'com.google.common.css.compiler.commandline.ClosureCommandLineCompiler'
+            classpath = project.files(stylesheetsJar)
+            args inputArgs.toArray()
+        }
+    }
+
+
+    List<String> interpolateList(String interpolationValue, List<String> inputList) {
+        List<String> outputList = new ArrayList<String>();
+        for (val in inputList) {
+            outputList.add(interpolationValue);
+            outputList.add(val);
+        }
+        return outputList;
+    }
+
 
     List<String> getJsPaths(Project project) {
         String jsRoot = getJsRootAbsolute(project).absolutePath
@@ -223,6 +281,7 @@ class GlovrPlugin implements Plugin<Project> {
 
 class GlovrPluginExtension {
     def jarName = "plovr-81ed862.jar"
+    def stylesheetsJarName = "closure-stylesheets-20111230.jar"
     def mainJs = "main.js"
     def jsRoot = "/src/main/javascript/"
     def jsOutputDir = "js"
@@ -235,6 +294,7 @@ class GlovrPluginExtension {
     def externs = null
     def paths = null
     def options = null
+    def cssDefines = null
 
     def autoLint = true
     def lintPaths = true
