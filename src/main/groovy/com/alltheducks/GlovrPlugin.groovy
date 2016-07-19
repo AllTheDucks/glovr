@@ -15,9 +15,8 @@ class GlovrPlugin implements Plugin<Project> {
 
         glovrHome = new File(project.rootProject.projectDir, ".glovr")
         glovrHome.mkdirs();
-        plovrJar = new File(glovrHome,project.glovr.jarName)
-        stylesheetsJar = new File(glovrHome,project.glovr.stylesheetsJarName)
-
+        plovrJar = new File(glovrHome, new File(new URL("${project.glovr.plovrJar}").path).name)
+        stylesheetsJar = new File(glovrHome, new File(new URL("${project.glovr.stylesheetsJar}").path).name)
 
         project.task('plovrServe') << {
             checkPlovrJar(project)
@@ -120,7 +119,7 @@ class GlovrPlugin implements Plugin<Project> {
 
         if (!plovrJar.exists()) {
             project.ant.get(
-                    src: "https://plovr.googlecode.com/files/${project.glovr.jarName}",
+                    src: "${project.glovr.plovrJar}",
                     dest: glovrHome
             )
         } else {
@@ -131,7 +130,7 @@ class GlovrPlugin implements Plugin<Project> {
 
         if (!stylesheetsJar.exists()) {
             project.ant.get(
-                    src: "https://closure-stylesheets.googlecode.com/files/${project.glovr.stylesheetsJarName}",
+                    src: "${project.glovr.stylesheetsJar}",
                     dest: glovrHome
             )
         } else {
@@ -297,8 +296,8 @@ class GlovrPlugin implements Plugin<Project> {
 
 
 class GlovrPluginExtension {
-    def jarName = "plovr-81ed862.jar"
-    def stylesheetsJarName = "closure-stylesheets-20111230.jar"
+    def plovrJar = "https://github.com/bolinfest/plovr/releases/download/v5.0.1/plovr.jar"
+    def stylesheetsJar = "https://github.com/google/closure-stylesheets/releases/download/v1.2.0/closure-stylesheets.jar"
     def mainJs = "main.js"
     def jsRoot = "/src/main/javascript/"
     def jsOutputDir = "js"

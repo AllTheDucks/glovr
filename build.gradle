@@ -1,40 +1,14 @@
 apply plugin: 'groovy'
 
 group = 'com.alltheducks'
-version = '1.0-SNAPSHOT'
-
-configurations {
-    deployerJars
-}
+version = '1.0.1'
 
 dependencies {
     compile gradleApi()
     compile localGroovy()
     compile 'com.google.code.gson:gson:2.2.4'
     compile 'commons-io:commons-io:2.4'
-    deployerJars "org.apache.maven.wagon:wagon-ssh-external:2.2"
-    deployerJars "org.apache.maven.wagon:wagon-ssh:2.2"
 }
 repositories {
-    // Use 'maven central' for resolving your dependencies.
-    // You can declare any Maven/Ivy/file repository here.
     mavenCentral()
-}
-
-apply plugin: 'maven'
-
-if (!project.hasProperty("userName") || !project.hasProperty("keyPath")) {
-    project.ext.set("userName", "")
-    project.ext.set("keyPath", "")
-}
-
-uploadArchives {
-    repositories {
-        mavenDeployer {
-            configuration = configurations.deployerJars
-            repository(url: "scp://alltheducks.com/var/www/repo.alltheducks.com/htdocs") {
-                authentication(userName: project.userName, privateKey: project.keyPath)
-            }
-        }
-    }
 }
