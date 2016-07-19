@@ -143,17 +143,17 @@ class GlovrPlugin implements Plugin<Project> {
 
     String generatePlovrServeConfig(Project project) {
         String mode = project.glovr.serveMode ? project.glovr.serveMode : project.glovr.mode;
-        String fileName = generatePlovrConfig(project, 'SERVE', mode)
+        String fileName = generatePlovrConfig(project, 'SERVE', mode, false)
         return fileName;
     }
 
     String generatePlovrBuildConfig(Project project) {
         String mode = project.glovr.buildMode ? project.glovr.buildMode : project.glovr.mode;
-        String fileName = generatePlovrConfig(project, 'BUILD', mode)
+        String fileName = generatePlovrConfig(project, 'BUILD', mode, project.glovr.cssRename)
         return fileName;
     }
 
-    String generatePlovrConfig(Project project, String configName, String mode) {
+    String generatePlovrConfig(Project project, String configName, String mode, boolean cssRename) {
         String fileName = project.name + "-plovr-" + configName + ".js"
         File configFile = new File(glovrHome, fileName)
         String jsRoot = getJsRootAbsolute(project).absolutePath
@@ -162,9 +162,15 @@ class GlovrPlugin implements Plugin<Project> {
         def cssDir = new File("$project.buildDir/plovr/compiled/$project.glovr.cssOutputDir");
         cssDir.mkdirs()
 
+        def inputs = new ArrayList()
+        if(cssRename) {
+            inputs.add(new String(glovrHome.absolutePath + '/cssRename.js'));
+        }
+        inputs.add(new String("$jsRoot/$project.glovr.mainJs"));
+
         def configMap = [id: project.name,
                 paths: getJsPaths(project),
-                inputs: new String("$jsRoot/$project.glovr.mainJs"),
+                inputs: inputs,
                 mode: mode,
                 externs: getExterns(project),
                 'output-file': new String("$project.buildDir/plovr/compiled/$project.glovr.jsOutputDir/$project.glovr.mainJs"),
@@ -219,6 +225,17 @@ class GlovrPlugin implements Plugin<Project> {
 
         if(project.glovr.cssDefines) {
             inputArgs.addAll(interpolateList('--define', project.glovr.cssDefines))
+        }
+
+        if(project.glovr.cssRename) {
+            inputArgs.add('--output-renaming-map-format')
+            inputArgs.add('CLOSURE_COMPILED')
+
+            inputArgs.add('--rename')
+            inputArgs.add('CLOSURE')
+
+            inputArgs.add('--output-renaming-map')
+            inputArgs.add(glovrHome.absolutePath + '/cssRename.js')
         }
 
         inputArgs.addAll(cssPaths)
@@ -295,6 +312,7 @@ class GlovrPluginExtension {
     def paths = null
     def options = null
     def cssDefines = null
+    def cssRename = false
 
     def autoLint = true
     def lintPaths = true
